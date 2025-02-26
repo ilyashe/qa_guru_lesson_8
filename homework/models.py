@@ -52,10 +52,11 @@ class Cart:
         Метод добавления продукта в корзину.
         Если продукт уже есть в корзине, то увеличиваем количество
         """
-        if product in self.products:
-            self.products[product] += buy_count
-        else:
-            self.products[product] = buy_count
+        if buy_count > 0:
+            if product in self.products:
+                self.products[product] += buy_count
+            else:
+                self.products[product] = buy_count
 
     def remove_product(self, product: Product, remove_count=None):
         """
@@ -74,8 +75,8 @@ class Cart:
 
     def get_total_price(self) -> float:
         total_price = 0
-        for product in self.products:
-            total_price += product.price * self.products[product]
+        for product, quantity in self.products.items():
+            total_price += product.price * quantity
         return total_price
 
     def buy(self):
@@ -84,9 +85,11 @@ class Cart:
         Учтите, что товаров может не хватать на складе.
         В этом случае нужно выбросить исключение ValueError
         """
-        for product in self.products:
-            if product.check_quantity(self.products[product]):
-                product.buy(self.products[product])
-            else:
+        for product, quantity in self.products.items():
+            if not product.check_quantity(quantity):
                 raise ValueError(f"Недостаточно товара '{product.name}' в наличии")
+
+        for product, quantity in self.products.items():
+            product.buy(quantity)
+
         self.products.clear()

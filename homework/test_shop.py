@@ -7,12 +7,17 @@ from homework.models import Product, Cart
 
 
 @pytest.fixture
-def product():
+def product_book() -> Product:
     return Product("book", 100, "This is a book", 1000)
 
 
 @pytest.fixture
-def cart():
+def product_toy() -> Product:
+    return Product("toy", 1000, "This is a toy", 100)
+
+
+@pytest.fixture
+def cart() -> Cart:
     return Cart()
 
 
@@ -22,22 +27,26 @@ class TestProducts:
     Например, текущий класс группирует тесты на класс Product
     """
 
-    def test_product_check_quantity(self, product):
+    def test_product_check_quantity_equal(self, product_book):
         # TODO напишите проверки на метод check_quantity
-        assert product.check_quantity(1000)
-        assert not product.check_quantity(1001)
+        assert product_book.check_quantity(product_book.quantity)
 
-    def test_product_buy(self, product):
+    def test_product_check_quantity_more(self, product_book):
+        # TODO напишите проверки на метод check_quantity
+        assert not product_book.check_quantity(product_book.quantity + 1)
+
+    def test_product_buy(self, product_book):
         # TODO напишите проверки на метод buy
-        product.buy(500)
-        assert product.check_quantity(500)
-        assert not product.check_quantity(501)
+        quantity_before = product_book.quantity
+        buy_amount = 500
+        product_book.buy(buy_amount)
+        assert product_book.quantity == quantity_before - buy_amount
 
-    def test_product_buy_more_than_available(self, product):
+    def test_product_buy_more_than_available(self, product_book):
         # TODO напишите проверки на метод buy,
         #  которые ожидают ошибку ValueError при попытке купить больше, чем есть в наличии
         with pytest.raises(ValueError, match="Недостаточно товара в наличии"):
-            product.buy(1001)
+            product_book.buy(product_book.quantity + 1)
 
 
 class TestCart:
@@ -47,46 +56,137 @@ class TestCart:
         На некоторые методы у вас может быть несколько тестов.
         Например, негативные тесты, ожидающие ошибку (используйте pytest.raises, чтобы проверить это)
     """
-    def test_cart_add_product(self, product, cart):
-        cart.add_product(product, 50)
-        assert cart.products[product] == 50
+    def test_cart_add_product_once(self, product_book, cart):
+        buy_count = 50
+        cart.add_product(product_book, buy_count)
+        assert cart.products[product_book] == buy_count
 
-        cart.add_product(product, 3)
-        assert cart.products[product] == 53
+    def test_cart_add_product_twice(self, product_book, cart):
+        buy_count_1 = 50
+        buy_count_2 = 3
+        cart.add_product(product_book, buy_count_1)
+        assert cart.products[product_book] == buy_count_1
+        cart.add_product(product_book, buy_count_2)
+        assert cart.products[product_book] == buy_count_1 + buy_count_2
 
-    def test_cart_remove_product(self, product, cart):
-        # remove_count < buy_count
-        cart.add_product(product, 50)
-        cart.remove_product(product, 20)
-        assert cart.products[product] == 30
-
-        # Без указания remove_count
-        cart.remove_product(product)
+    def test_cart_add_zero_product_(self, product_book, cart):
+        buy_count = 0
+        cart.add_product(product_book, buy_count)
         assert not cart.products
 
-        # remove_count > buy_count
-        cart.add_product(product, 3)
-        cart.remove_product(product, 20)
+    def test_cart_add_two_products(self, product_book, product_toy, cart):
+        buy_count_book = 50
+        buy_count_toy = 40
+        cart.add_product(product_book, buy_count_book)
+        cart.add_product(product_toy, buy_count_toy)
+        assert cart.products[product_book] == buy_count_book
+        assert cart.products[product_toy] == buy_count_toy
+
+    def test_cart_remove_product_with_remove_count_less(self, product_book, cart):
+        buy_count = 50
+        remove_count = buy_count - 20
+        cart.add_product(product_book, buy_count)
+        cart.remove_product(product_book, remove_count)
+        assert cart.products[product_book] == buy_count - remove_count
+
+    def test_cart_remove_product_without_remove_count(self, product_book, cart):
+        buy_count = 50
+        cart.add_product(product_book, buy_count)
+        cart.remove_product(product_book)
         assert not cart.products
 
-    def test_cart_clear(self, product, cart):
-        cart.add_product(product, 50)
+    def test_cart_remove_product_with_remove_count_over(self, product_book, cart):
+        buy_count = 50
+        cart.add_product(product_book, buy_count)
+        cart.remove_product(product_book, buy_count + 20)
+        assert not cart.products
+
+    def test_cart_remove_one_of_two_products(self, product_book, product_toy, cart):
+        buy_count = 50
+        cart.add_product(product_book, buy_count)
+        cart.add_product(product_toy, buy_count)
+        cart.remove_product(product_book)
+        assert product_book not in cart.products
+        assert cart.products[product_toy] == buy_count
+
+    def test_cart_remove_absent_product(self, product_book, product_toy, cart):
+        buy_count = 50
+        cart.add_product(product_toy, buy_count)
+        cart.remove_product(product_book)
+        assert product_book not in cart.products
+        assert cart.products[product_toy] == buy_count
+
+    def test_cart_remove_product_from_empty_card(self, product_book, cart):
+        cart.remove_product(product_book)
+        assert not cart.products
+
+    def test_cart_clear(self, product_book, cart):
+        buy_count = 50
+        cart.add_product(product_book, buy_count)
         cart.clear()
         assert not cart.products
 
-    def test_cart_get_total_price(self, product, cart):
-        cart.add_product(product, 5)
-        assert cart.get_total_price() == 500
-
-    def test_cart_buy(self, product, cart):
-        cart.add_product(product, 5)
-        cart.buy()
-        assert product.check_quantity(995)
+    def test_cart_empty_clear(self, product_book, cart):
+        cart.clear()
         assert not cart.products
 
-    def test_cart_buy_more_than_available(self, product, cart):
-        cart.add_product(product, 1005)
+    def test_cart_get_total_price_one_product(self, product_book, cart):
+        buy_count = 5
+        cart.add_product(product_book, buy_count)
+        assert cart.get_total_price() == product_book.price * buy_count
+
+    def test_cart_get_total_price_two_products(self, product_book, product_toy, cart):
+        buy_count_book = 5
+        buy_count_toy = 10
+        cart.add_product(product_book, buy_count_book)
+        cart.add_product(product_toy, buy_count_toy)
+        assert cart.get_total_price() == product_book.price * buy_count_book + product_toy.price * buy_count_toy
+
+    def test_cart_get_total_price_empty(self, cart):
+        assert cart.get_total_price() == 0
+
+    def test_cart_buy(self, product_book, cart):
+        buy_count = 5
+        quantity_before = product_book.quantity
+        cart.add_product(product_book, buy_count)
+        cart.buy()
+        assert product_book.quantity == quantity_before - buy_count
+        assert not cart.products
+
+    def test_cart_buy_two_products(self, product_book, product_toy, cart):
+        buy_count = 5
+        quantity_before_book = product_book.quantity
+        quantity_before_toy = product_toy.quantity
+        cart.add_product(product_book, buy_count)
+        cart.add_product(product_toy, buy_count)
+        cart.buy()
+        assert product_book.quantity == quantity_before_book - buy_count
+        assert product_toy.quantity == quantity_before_toy - buy_count
+        assert not cart.products
+
+    def test_cart_buy_more_than_available(self, product_book, cart):
+        buy_count = product_book.quantity + 1
+        quantity_before = product_book.quantity
+        cart.add_product(product_book, buy_count)
         with pytest.raises(ValueError):
             cart.buy()
-        assert product.check_quantity(1000)
-        assert cart.products[product] == 1005
+        assert product_book.quantity == quantity_before
+        assert cart.products[product_book] == buy_count
+
+    def test_cart_buy_more_than_available_one_of_two_products(self, product_book, product_toy, cart):
+        buy_count_toy = product_toy.quantity + 1
+        quantity_before_toy = product_toy.quantity
+        quantity_before_book = product_book.quantity
+        buy_count_book = 5
+        cart.add_product(product_book, buy_count_book)
+        cart.add_product(product_toy, buy_count_toy)
+        with pytest.raises(ValueError):
+            cart.buy()
+        assert product_toy.quantity == quantity_before_toy
+        assert product_book.quantity == quantity_before_book
+        assert cart.products[product_toy] == buy_count_toy
+        assert cart.products[product_book] == buy_count_book
+
+    def test_cart_buy_empty(self, cart):
+        cart.buy()
+        assert not cart.products
